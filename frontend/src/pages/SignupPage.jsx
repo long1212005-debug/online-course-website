@@ -12,9 +12,11 @@ const SignupPage = () => {
     fullName: "",
     email: "",
     password: "",
+    confirmPassword: "",
     phoneNumber: "",
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -22,6 +24,18 @@ const SignupPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Mật khẩu phải có ít nhất 6 ký tự.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -31,7 +45,8 @@ const SignupPage = () => {
           ? "/auth/register/teacher"
           : "/auth/register/student";
 
-      await axiosClient.post(endpoint, formData);
+      const { confirmPassword, ...payload } = formData;
+      await axiosClient.post(endpoint, payload);
 
       alert("Đăng ký thành công! Vui lòng đăng nhập.");
       navigate("/login");
@@ -39,7 +54,7 @@ const SignupPage = () => {
       console.error(error);
       const msg =
         error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
-      alert(msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -86,6 +101,11 @@ const SignupPage = () => {
 
         {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
           <div className="rounded-md shadow-sm -space-y-px">
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -140,6 +160,20 @@ const SignupPage = () => {
                 className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                 placeholder="••••••••"
                 value={formData.password}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Xác nhận mật khẩu
+              </label>
+              <input
+                name="confirmPassword"
+                type="password"
+                required
+                className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                placeholder="Nhập lại mật khẩu"
+                value={formData.confirmPassword}
                 onChange={handleChange}
               />
             </div>

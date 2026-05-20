@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,6 +39,12 @@ public class PaymentController {
 
     private final VNPayConfig vnPayConfig;
     private final RestTemplate restTemplate;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
+    @Value("${service.enrollment.url:http://localhost:8084}")
+    private String enrollmentServiceUrl;
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -181,19 +188,19 @@ public class PaymentController {
             // 4. Kích hoạt khóa học (Enrollment)
             try {
                 callEnrollmentService(courseId, courseTitle, studentEmail, teacherId);
-                response.sendRedirect("http://localhost:5173/payment-success?courseId=" + courseId);
+                response.sendRedirect(frontendUrl + "/payment-success?courseId=" + courseId);
             } catch (Exception e) {
                 logger.error("!!! [ERROR] Lỗi Enrollment: ", e);
-                response.sendRedirect("http://localhost:5173/payment-failed?code=enrollment_failed");
+                response.sendRedirect(frontendUrl + "/payment-failed?code=enrollment_failed");
             }
         } else {
-            response.sendRedirect("http://localhost:5173/payment-failed?code=vnpay_failed");
+            response.sendRedirect(frontendUrl + "/payment-failed?code=vnpay_failed");
         }
     }
 
     // Hàm gọi Enrollment Service
     private void callEnrollmentService(Long courseId, String courseTitle, String email, Long teacherId) {
-        String enrollmentUrl = "http://localhost:8084/api/v1/enrollments/internal/enroll";
+        String enrollmentUrl = enrollmentServiceUrl + "/api/v1/enrollments/internal/enroll";
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("courseId", courseId);

@@ -46,10 +46,12 @@ const LoginPage = () => {
       }
     } catch (err) {
       console.error("Login Error:", err);
-      // Xử lý hiển thị lỗi từ backend trả về (nếu có message)
+      const status = err.response?.status;
+      const backendMessage = err.response?.data?.message;
       const message =
-        err.response?.data?.message ||
-        "Đăng nhập thất bại. Vui lòng kiểm tra lại!";
+        status === 401 || status === 403 || backendMessage === "error"
+          ? "Email hoặc mật khẩu không đúng."
+          : backendMessage || "Đăng nhập thất bại. Vui lòng thử lại.";
       setError(message);
     } finally {
       setIsLoading(false);

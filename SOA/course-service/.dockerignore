@@ -1,0 +1,7 @@
+target
+uploads
+.mvn
+mvnw
+mvnw.cmd
+.git
+.gitignore

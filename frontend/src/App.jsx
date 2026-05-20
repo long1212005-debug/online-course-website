@@ -57,6 +57,7 @@ function App() {
           {/* 🟢 NHÓM 1: PUBLIC / STUDENT / TEACHER (Dùng Layout Chung) */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/courses" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/course/:id" element={<CourseDetail />} />

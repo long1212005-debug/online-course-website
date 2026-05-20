@@ -26,7 +26,8 @@ const HomePage = () => {
     if (!url)
       return "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800";
     if (url.startsWith("http")) return url;
-    return `http://localhost:8080${url}`;
+    const apiOrigin = import.meta.env.VITE_API_ORIGIN || "";
+    return `${apiOrigin}${url}`;
   };
 
   return (
@@ -92,6 +93,11 @@ const HomePage = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          {courses.length === 0 && (
+            <div className="col-span-full rounded-lg border border-dashed border-gray-300 bg-white px-6 py-12 text-center text-gray-600">
+              Hiện chưa có khóa học nào. Vui lòng quay lại sau hoặc đăng nhập bằng tài khoản giáo viên để tạo khóa học.
+            </div>
+          )}
           {courses.map((course) => (
             <Link
               to={`/course/${course.id}`}

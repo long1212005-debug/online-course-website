@@ -1,0 +1,2 @@
+include:
+  - ./SOA/docker-compose.yml

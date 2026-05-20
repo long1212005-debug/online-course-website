@@ -22,7 +22,8 @@ const CourseDetail = () => {
 
     // Nếu là link nội bộ (/images/...), nối với localhost backend
     // Bạn có thể thay localhost:8080 bằng domain thật khi deploy
-    return `http://localhost:8080${imagePath}`;
+    const apiOrigin = import.meta.env.VITE_API_ORIGIN || "";
+    return `${apiOrigin}${imagePath}`;
   };
 
   // 1. Load thông tin khóa học

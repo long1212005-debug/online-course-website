@@ -3,202 +3,256 @@ services:
     image: mysql:8.0
     container_name: mysql
     ports:
-      - "3307:3306"
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: user_service_db,course_service_db,enrollment_service_db
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     networks:
       - soa-network
-    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
     environment:
-      # Tạo tài khoản admin thay cho guest để không bị chặn loopback
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=admin
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
     ports:
       - "5672:5672"
       - "15672:15672"
     networks:
       - soa-network
-    restart: always
-
-  discovery-service:
-    image: soa-discovery-service:latest
-    container_name: soa-discovery-service
-    build:
-      context: ./discovery-service
-      dockerfile: Dockerfile
-    ports:
-      - "8761:8761"
-    networks:
-      - soa-network
-    depends_on:
-      - config-service
-    restart: always
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   config-service:
     image: soa-config-service:latest
-    container_name: soa-config-service
+    container_name: config-service
     build:
       context: ./config-service
       dockerfile: Dockerfile
     ports:
       - "8888:8888"
+    environment:
+      EUREKA_HOST: discovery-service
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
+
+  discovery-service:
+    image: soa-discovery-service:latest
+    container_name: discovery-service
+    build:
+      context: ./discovery-service
+      dockerfile: Dockerfile
+    ports:
+      - "8761:8761"
+    environment:
+      CONFIG_HOST: config-service
+    depends_on:
+      - config-service
+    networks:
+      - soa-network
+    restart: unless-stopped
 
   api-gateway:
     image: soa-api-gateway:latest
-    container_name: soa-api-gateway
+    container_name: api-gateway
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
+      COURSE_SERVICE_URL: http://course-service:8082
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_APPLICATION_JSON: '{"eureka":{"client":{"service-url":{"defaultZone":"http://discovery-service:8761/eureka/"}}}}'
     depends_on:
-      - discovery-service
       - config-service
+      - discovery-service
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
 
   user-service:
     image: soa-user-service:latest
-    container_name: soa-user-service
+    container_name: user-service
     build:
       context: ./user-service
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
     environment:
-      # Tắt config server để tránh lỗi connection refused lúc khởi động
-      SPRING_CLOUD_CONFIG_ENABLED: "false"
-      EUREKA_CLIENT_ENABLED: "false"
-
-      # Cấu hình DB cứng
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_service_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-
-      # Cấu hình RabbitMQ
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      RABBIT_HOST: rabbitmq
+      RABBIT_USERNAME: admin
+      RABBIT_PASSWORD: admin
+      FRONTEND_URL: http://localhost:3000
     depends_on:
-      - mysql
-      - rabbitmq
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-service:
+        condition: service_started
+      discovery-service:
+        condition: service_started
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
+
   course-service:
     image: soa-course-service:latest
-    container_name: soa-course-service
+    container_name: course-service
     build:
       context: ./course-service
       dockerfile: Dockerfile
     ports:
       - "8082:8082"
-    # [FIX] Thêm volume để lưu trữ ảnh/video bền vững
     volumes:
       - ./uploads_data:/app/uploads
     environment:
-      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/course_service_db?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-      spring.cloud.config.retry.initial-interval: 3000
-      spring.cloud.config.retry.max-attempts: 10
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      RABBIT_HOST: rabbitmq
+      RABBIT_USERNAME: admin
+      RABBIT_PASSWORD: admin
     depends_on:
-      - mysql
-      - discovery-service
-      - config-service
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-service:
+        condition: service_started
+      discovery-service:
+        condition: service_started
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
 
   payment-service:
     image: soa-payment-service:latest
-    container_name: soa-payment-service
+    container_name: payment-service
     build:
       context: ./payment-service
       dockerfile: Dockerfile
     ports:
       - "8083:8083"
     environment:
-      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      RABBIT_HOST: rabbitmq
+      RABBIT_USERNAME: admin
+      RABBIT_PASSWORD: admin
+      ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
+      FRONTEND_URL: http://localhost:3000
     depends_on:
-      - discovery-service
-      - config-service
-      - rabbitmq
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-service:
+        condition: service_started
+      discovery-service:
+        condition: service_started
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
 
   enrollment-service:
     image: soa-enrollment-service:latest
-    container_name: soa-enrollment-service
+    container_name: enrollment-service
     build:
       context: ./enrollment-service
       dockerfile: Dockerfile
     ports:
       - "8084:8084"
     environment:
-      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/enrollment_service_db?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: guest
-      SPRING_RABBITMQ_PASSWORD: guest
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      RABBIT_HOST: rabbitmq
+      RABBIT_USERNAME: admin
+      RABBIT_PASSWORD: admin
+      COURSE_SERVICE_URL: http://course-service:8082
     depends_on:
-      - mysql
-      - discovery-service
-      - config-service
-      - rabbitmq
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      config-service:
+        condition: service_started
+      discovery-service:
+        condition: service_started
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
 
   notification-service:
     image: soa-notification-service:latest
-    container_name: soa-notification-service
+    container_name: notification-service
     build:
       context: ./notification-service
       dockerfile: Dockerfile
     ports:
       - "8085:8085"
     environment:
-      SPRING_CONFIG_IMPORT: optional:configserver:http://config-service:8888
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      CONFIG_HOST: config-service
+      EUREKA_HOST: discovery-service
       RABBIT_HOST: rabbitmq
-      RABBIT_PORT: 5672
       RABBIT_USERNAME: admin
       RABBIT_PASSWORD: admin
+      FRONTEND_URL: http://localhost:3000
     depends_on:
-      - discovery-service
-      - config-service
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      config-service:
+        condition: service_started
+      discovery-service:
+        condition: service_started
     networks:
       - soa-network
-    restart: always
+    restart: unless-stopped
+
+  frontend:
+    image: webbankhoahoc-frontend:latest
+    container_name: frontend
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - soa-network
+    restart: unless-stopped
 
 volumes:
   mysql-data:
