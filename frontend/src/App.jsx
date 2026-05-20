@@ -10,6 +10,8 @@ import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import CourseDetail from "./pages/CourseDetail";
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PaymentSuccess from "./pages/PaymentSuccess";
 
 // 🔥 IMPORT MỚI: Trang Lỗi Thanh Toán
@@ -59,6 +61,8 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/courses" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/course/:id" element={<CourseDetail />} />
             {/* ROUTE THANH TOÁN */}

@@ -147,12 +147,12 @@ const LoginPage = () => {
             </div>
 
             <div className="text-sm">
-              <a
-                href="#"
+              <Link
+                to="/forgot-password"
                 className="font-medium text-purple-600 hover:text-purple-500 transition"
               >
                 Quên mật khẩu?
-              </a>
+              </Link>
             </div>
           </div>
 
