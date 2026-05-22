@@ -45,12 +45,18 @@ const CourseDetail = () => {
   // 2. Load trạng thái ghi danh (Chỉ chạy khi đã login & có ID khóa học)
   useEffect(() => {
     const checkEnrollment = async () => {
-      if (!user?.id) return; // Chưa login thì thôi
+      setIsEnrolled(false);
+
+      if (!user?.email) return; // Chưa login thì thôi
 
       try {
         // Gọi sang Enrollment Service để lấy danh sách khóa đã mua
         const res = await axiosClient.get("/enrollments/my-courses");
-        const myCourses = res.data.data || res.data || [];
+        const myCourses = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
 
         // Kiểm tra xem khóa học hiện tại (id) có trong danh sách đã mua không
         // So sánh lỏng (==) để tránh lệch kiểu string/number
@@ -58,6 +64,7 @@ const CourseDetail = () => {
 
         setIsEnrolled(check);
       } catch (error) {
+        setIsEnrolled(false);
         console.error("Lỗi kiểm tra ghi danh:", error);
       }
     };

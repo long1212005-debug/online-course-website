@@ -44,8 +44,14 @@ const AdminDashboard = () => {
           axiosClient.get("/payments/stats/dashboard"),
           axiosClient.get("/users/stats"),
         ]);
-        if (resDash.data?.data) setDashboardData(resDash.data.data);
-        if (resUser.data) setUserStats(resUser.data);
+        setDashboardData(resDash.data?.data || resDash.data || {});
+        setUserStats(
+          Array.isArray(resUser.data?.data)
+            ? resUser.data.data
+            : Array.isArray(resUser.data)
+            ? resUser.data
+            : []
+        );
       } catch (error) {
         console.error("Lỗi tải dữ liệu:", error);
       } finally {
@@ -61,13 +67,28 @@ const AdminDashboard = () => {
       currency: "VND",
     }).format(amount || 0);
 
+  const toNumber = (value) => Number(value || 0);
+  const revenueChart = Array.isArray(dashboardData?.revenueChart)
+    ? dashboardData.revenueChart
+    : [];
+  const topCourses = Array.isArray(dashboardData?.topCourses)
+    ? dashboardData.topCourses
+    : [];
+  const recentTransactions = Array.isArray(dashboardData?.recentTransactions)
+    ? dashboardData.recentTransactions
+    : [];
+  const totalTopCourseSales = topCourses.reduce(
+    (total, item) => total + toNumber(item.value),
+    0
+  );
+
   // --- CHART CONFIGS ---
   const lineChartData = {
-    labels: dashboardData?.revenueChart?.map((d) => d.label) || [],
+    labels: revenueChart.map((d) => d.label),
     datasets: [
       {
         label: "Doanh thu",
-        data: dashboardData?.revenueChart?.map((d) => Number(d.value)) || [],
+        data: revenueChart.map((d) => toNumber(d.value)),
         fill: true,
         backgroundColor: (context) => {
           const ctx = context.chart.ctx;
@@ -88,6 +109,10 @@ const AdminDashboard = () => {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
+  };
+
+  const axisChartOptions = {
+    ...commonOptions,
     scales: {
       x: {
         grid: { display: false },
@@ -101,11 +126,16 @@ const AdminDashboard = () => {
     },
   };
 
+  const doughnutOptions = {
+    ...commonOptions,
+    cutout: "70%",
+  };
+
   const doughnutData = {
-    labels: dashboardData?.topCourses?.map((c) => c.label) || [],
+    labels: topCourses.map((c) => c.label),
     datasets: [
       {
-        data: dashboardData?.topCourses?.map((c) => Number(c.value)) || [],
+        data: topCourses.map((c) => toNumber(c.value)),
         backgroundColor: CHART_COLORS,
         borderWidth: 0,
         hoverOffset: 4,
@@ -118,7 +148,7 @@ const AdminDashboard = () => {
     datasets: [
       {
         label: "Thành viên",
-        data: userStats.map((d) => d.value),
+        data: userStats.map((d) => toNumber(d.value)),
         backgroundColor: "#8b5cf6",
         borderRadius: 4,
         barThickness: 20,
@@ -162,7 +192,7 @@ const AdminDashboard = () => {
         />
         <KpiCard
           title="Giao dịch"
-          value={dashboardData?.recentTransactions?.length || 0}
+          value={recentTransactions.length}
           iconName="cart"
           color="rose"
         />
@@ -175,7 +205,11 @@ const AdminDashboard = () => {
             Biến động doanh thu
           </h3>
           <div className="h-72">
-            <Line data={lineChartData} options={commonOptions} />
+            {revenueChart.length > 0 ? (
+              <Line data={lineChartData} options={axisChartOptions} />
+            ) : (
+              <EmptyChartMessage />
+            )}
           </div>
         </div>
 
@@ -186,20 +220,17 @@ const AdminDashboard = () => {
           <div className="flex-1 flex items-center justify-center relative min-h-[200px]">
             <Doughnut
               data={doughnutData}
-              options={{ ...commonOptions, cutout: "70%" }}
+              options={doughnutOptions}
             />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-3xl font-bold text-slate-800">
-                {dashboardData?.topCourses?.reduce(
-                  (a, b) => a + Number(b.value),
-                  0
-                )}
+                {totalTopCourseSales}
               </span>
               <span className="text-xs text-slate-500 uppercase">Đã bán</span>
             </div>
           </div>
           <div className="mt-6 space-y-3">
-            {dashboardData?.topCourses?.slice(0, 4).map((c, i) => (
+            {topCourses.slice(0, 4).map((c, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span
@@ -224,7 +255,11 @@ const AdminDashboard = () => {
             Tăng trưởng người dùng
           </h3>
           <div className="h-60">
-            <Bar data={userChartData} options={commonOptions} />
+            {userStats.length > 0 ? (
+              <Bar data={userChartData} options={axisChartOptions} />
+            ) : (
+              <EmptyChartMessage />
+            )}
           </div>
         </div>
 
@@ -249,7 +284,7 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {dashboardData?.recentTransactions?.map((tx) => (
+                {recentTransactions.map((tx) => (
                   <tr
                     key={tx.id}
                     className="hover:bg-slate-50/50 transition-colors"
@@ -285,6 +320,12 @@ const LoadingState = () => (
   <div className="h-[80vh] flex flex-col items-center justify-center">
     <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
     <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+  </div>
+);
+
+const EmptyChartMessage = () => (
+  <div className="h-full min-h-[160px] flex items-center justify-center text-sm text-slate-400">
+    Chưa có dữ liệu thống kê
   </div>
 );
 

@@ -8,7 +8,14 @@ const MyCourses = () => {
   useEffect(() => {
     axiosClient
       .get("/enrollments/my-courses")
-      .then((res) => setEnrollments(res.data))
+      .then((res) => {
+        const myCourses = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
+        setEnrollments(myCourses);
+      })
       .catch((err) => console.error(err));
   }, []);
 

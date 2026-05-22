@@ -31,7 +31,12 @@ public class SecurityConfig {
 
                 // 4. Phân quyền
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/payments/vnpay-return", "/api/v1/payments/ipn").permitAll()
+                        .requestMatchers(
+                                "/api/v1/payments/vnpay-return",
+                                "/api/v1/payments/ipn",
+                                "/api/v1/payments/momo-return",
+                                "/api/v1/payments/momo-ipn"
+                        ).permitAll()
                         .requestMatchers("/api/v1/wallet/**").authenticated()
                         .anyRequest().authenticated());
 

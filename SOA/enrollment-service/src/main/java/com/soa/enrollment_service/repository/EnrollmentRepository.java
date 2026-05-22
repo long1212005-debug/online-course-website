@@ -8,7 +8,7 @@ import java.util.List;
 @Repository
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
-    boolean existsByStudentEmailAndCourseId(String studentEmail, Long courseId);
+    boolean existsByStudentEmailIgnoreCaseAndCourseId(String studentEmail, Long courseId);
 
-    List<Enrollment> findByStudentEmail(String studentEmail);
+    List<Enrollment> findByStudentEmailIgnoreCase(String studentEmail);
 }

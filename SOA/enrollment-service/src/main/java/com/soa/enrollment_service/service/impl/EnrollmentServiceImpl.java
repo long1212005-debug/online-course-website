@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,8 +28,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     @Transactional
     public void createEnrollment(Long userId, String email, Long courseId, Long teacherId, String courseTitle,
             Double amount, String imageUrl) {
+        String normalizedEmail = normalizeEmail(email);
         // 1. Check trùng
-        if (enrollmentRepository.existsByStudentEmailAndCourseId(email, courseId)) {
+        if (enrollmentRepository.existsByStudentEmailIgnoreCaseAndCourseId(normalizedEmail, courseId)) {
             System.out.println(">>> User " + email + " đã sở hữu khóa học này.");
             return;
         }
@@ -36,7 +38,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         // 2. Lưu Enrollment (Đã có userId)
         Enrollment enrollment = new Enrollment();
         enrollment.setUserId(userId); // 🔥 QUAN TRỌNG: Phải set dòng này
-        enrollment.setStudentEmail(email);
+        enrollment.setStudentEmail(normalizedEmail);
         enrollment.setCourseId(courseId);
         enrollment.setTeacherId(teacherId);
         enrollment.setCourseTitle(courseTitle);
@@ -59,9 +61,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     @Override
     public List<EnrollmentResponseDTO> getMyEnrollments(String email) {
-        return enrollmentRepository.findByStudentEmail(email).stream()
+        return enrollmentRepository.findByStudentEmailIgnoreCase(normalizeEmail(email)).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private void incrementStudentCountInCourseService(Long courseId) {

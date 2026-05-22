@@ -7,10 +7,8 @@ import com.soa.payment_service.dto.RestResponse;
 import com.soa.payment_service.entity.TransactionHistory;
 import com.soa.payment_service.repository.TransactionRepository;
 import com.soa.payment_service.service.WalletService;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,16 +17,26 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 @RestController
@@ -46,6 +54,9 @@ public class PaymentController {
     @Value("${service.enrollment.url:http://localhost:8084}")
     private String enrollmentServiceUrl;
 
+    @Value("${payment.test-mode.enabled:false}")
+    private boolean paymentTestModeEnabled;
+
     @Autowired
     private TransactionRepository transactionRepository;
 
@@ -57,7 +68,6 @@ public class PaymentController {
         this.restTemplate = restTemplate;
     }
 
-    // --- API TẠO THANH TOÁN VNPAY ---
     @GetMapping("/create_payment")
     public ResponseEntity<PaymentDTO> createPayment(
             HttpServletRequest req,
@@ -66,139 +76,159 @@ public class PaymentController {
             @RequestParam("courseTitle") String courseTitle,
             @RequestParam("email") String studentEmail,
             @RequestParam("teacherEmail") String teacherEmail,
-            @RequestParam("teacherId") Long teacherId) // ID CẦN KIỂM TRA
-            throws UnsupportedEncodingException {
+            @RequestParam("teacherId") Long teacherId) throws IOException {
 
-        // 🔥 LOG KIỂM TRA: XÁC ĐỊNH ID GIÁO VIÊN NHẬN ĐƯỢC TỪ FRONTEND
-        logger.info(">>> [PAYMENT START] Course ID: {}, Teacher ID NHẬN TỪ FRONTEND: {}", courseId, teacherId);
+        logger.info(">>> [VNPAY START] Course ID: {}, Teacher ID: {}", courseId, teacherId);
 
-        String vnp_TxnRef = vnPayConfig.getRandomNumber(8);
-        String vnp_IpAddr = vnPayConfig.getIpAddress(req);
+        String vnpTxnRef = vnPayConfig.getRandomNumber(8);
+        String vnpIpAddr = vnPayConfig.getIpAddress(req);
         long amountVal = amount * 100;
 
-        Map<String, String> vnp_Params = new HashMap<>();
-        vnp_Params.put("vnp_Version", vnPayConfig.vnp_Version);
-        vnp_Params.put("vnp_Command", vnPayConfig.vnp_Command);
-        vnp_Params.put("vnp_TmnCode", vnPayConfig.vnp_TmnCode);
-        vnp_Params.put("vnp_Amount", String.valueOf(amountVal));
-        vnp_Params.put("vnp_CurrCode", "VND");
-        vnp_Params.put("vnp_BankCode", "NCB");
-        vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
-        vnp_Params.put("vnp_OrderInfo", "Thanh toan khoa hoc " + courseId);
-        vnp_Params.put("vnp_OrderType", vnPayConfig.orderType);
-        vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_IpAddr", vnp_IpAddr);
+        Map<String, String> vnpParams = new HashMap<>();
+        vnpParams.put("vnp_Version", vnPayConfig.vnp_Version);
+        vnpParams.put("vnp_Command", vnPayConfig.vnp_Command);
+        vnpParams.put("vnp_TmnCode", vnPayConfig.vnp_TmnCode);
+        vnpParams.put("vnp_Amount", String.valueOf(amountVal));
+        vnpParams.put("vnp_CurrCode", "VND");
+        vnpParams.put("vnp_BankCode", "NCB");
+        vnpParams.put("vnp_TxnRef", vnpTxnRef);
+        vnpParams.put("vnp_OrderInfo", "Thanh toan khoa hoc " + courseId);
+        vnpParams.put("vnp_OrderType", vnPayConfig.orderType);
+        vnpParams.put("vnp_Locale", "vn");
+        vnpParams.put("vnp_IpAddr", vnpIpAddr);
 
-        // Gắn teacherId vào URL trả về
         String returnUrlWithData = vnPayConfig.vnp_ReturnUrl
                 + "?courseId=" + courseId
                 + "&studentEmail=" + URLEncoder.encode(studentEmail, StandardCharsets.US_ASCII.toString())
                 + "&teacherEmail=" + URLEncoder.encode(teacherEmail, StandardCharsets.US_ASCII.toString())
                 + "&courseTitle=" + URLEncoder.encode(courseTitle, StandardCharsets.US_ASCII.toString())
                 + "&teacherId=" + teacherId;
+        vnpParams.put("vnp_ReturnUrl", returnUrlWithData);
 
-        vnp_Params.put("vnp_ReturnUrl", returnUrlWithData);
-
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        TimeZone vnTimeZone = TimeZone.getTimeZone("Asia/Ho_Chi_Minh");
+        Calendar cld = Calendar.getInstance(vnTimeZone);
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        String vnp_CreateDate = formatter.format(cld.getTime());
-        vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+        formatter.setTimeZone(vnTimeZone);
+        String vnpCreateDate = formatter.format(cld.getTime());
+        vnpParams.put("vnp_CreateDate", vnpCreateDate);
 
         cld.add(Calendar.MINUTE, 15);
-        String vnp_ExpireDate = formatter.format(cld.getTime());
-        vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
+        String vnpExpireDate = formatter.format(cld.getTime());
+        vnpParams.put("vnp_ExpireDate", vnpExpireDate);
 
-        List fieldNames = new ArrayList(vnp_Params.keySet());
+        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
         Collections.sort(fieldNames);
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
-        Iterator itr = fieldNames.iterator();
+        Iterator<String> itr = fieldNames.iterator();
         while (itr.hasNext()) {
-            String fieldName = (String) itr.next();
-            String fieldValue = (String) vnp_Params.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                hashData.append(fieldName);
-                hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
-                query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+            String fieldName = itr.next();
+            String fieldValue = vnpParams.get(fieldName);
+            if (fieldValue != null && !fieldValue.isBlank()) {
+                hashData.append(fieldName).append('=')
+                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()))
+                        .append('=')
+                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
                 if (itr.hasNext()) {
                     query.append('&');
                     hashData.append('&');
                 }
             }
         }
-        String queryUrl = query.toString();
-        String vnp_SecureHash = vnPayConfig.hmacSHA512(vnPayConfig.secretKey, hashData.toString());
-        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        String paymentUrl = vnPayConfig.vnp_PayUrl + "?" + queryUrl;
+
+        String secureHash = vnPayConfig.hmacSHA512(vnPayConfig.secretKey, hashData.toString());
+        String paymentUrl = vnPayConfig.vnp_PayUrl + "?" + query + "&vnp_SecureHash=" + secureHash;
+
+        logger.info(">>> [VNPAY CREATE] TxnRef: {}, CreateDate: {}, ExpireDate: {}",
+                vnpTxnRef, vnpCreateDate, vnpExpireDate);
 
         PaymentDTO paymentDTO = new PaymentDTO();
         paymentDTO.setStatus("OK");
         paymentDTO.setMessage("Successfully");
         paymentDTO.setURL(paymentUrl);
-
         return ResponseEntity.ok(paymentDTO);
     }
 
-    // --- XỬ LÝ KẾT QUẢ TRẢ VỀ ---
     @GetMapping("/vnpay-return")
     public void vnpayReturn(
             @RequestParam(value = "vnp_ResponseCode") String responseCode,
             @RequestParam(value = "vnp_Amount") String vnpAmount,
             @RequestParam(value = "vnp_TxnRef") String txnRef,
-            @RequestParam(value = "courseId") Long courseId,
-            @RequestParam(value = "courseTitle") String courseTitle,
-            @RequestParam(value = "studentEmail") String studentEmail,
-            @RequestParam(value = "teacherEmail") String teacherEmail,
-            @RequestParam(value = "teacherId") Long teacherId, // ID SAI VẪN ĐƯỢC NHẬN
+            @RequestParam("courseId") Long courseId,
+            @RequestParam("courseTitle") String courseTitle,
+            @RequestParam("studentEmail") String studentEmail,
+            @RequestParam("teacherEmail") String teacherEmail,
+            @RequestParam("teacherId") Long teacherId,
             HttpServletResponse response) throws IOException {
 
-        if ("00".equals(responseCode)) {
-            // 1. Tính toán tiền
-            BigDecimal totalAmount = new BigDecimal(vnpAmount).divide(new BigDecimal(100));
-            BigDecimal adminShare = totalAmount.multiply(new BigDecimal("0.40"));
-            BigDecimal teacherShare = totalAmount.subtract(adminShare);
-
-            // 2. Lưu lịch sử
-            TransactionHistory history = new TransactionHistory();
-            history.setTransactionId(txnRef);
-            history.setCourseId(courseId);
-            history.setCourseTitle(courseTitle);
-            history.setStudentEmail(studentEmail);
-            history.setTeacherEmail(teacherEmail);
-            history.setTeacherId(teacherId);
-            history.setTotalAmount(totalAmount);
-            history.setAdminCommission(adminShare);
-            history.setTeacherReceived(teacherShare);
-
-            transactionRepository.save(history);
-
-            // 3. CỘNG TIỀN VÀO VÍ GIÁO VIÊN
-            try {
-                // 🔥 LOG KIỂM TRA: ID ĐƯỢC DÙNG ĐỂ CỘNG VÍ
-                logger.info(">>> [PAYMENT SUCCESS] Đang cộng ví cho Teacher ID: {} số tiền: {}", teacherId,
-                        teacherShare);
-                walletService.processRevenueShare(teacherId, totalAmount, courseTitle);
-            } catch (Exception e) {
-                logger.error("!!! [ERROR] Lỗi cộng ví: ", e);
-            }
-
-            // 4. Kích hoạt khóa học (Enrollment)
-            try {
-                callEnrollmentService(courseId, courseTitle, studentEmail, teacherId);
-                response.sendRedirect(frontendUrl + "/payment-success?courseId=" + courseId);
-            } catch (Exception e) {
-                logger.error("!!! [ERROR] Lỗi Enrollment: ", e);
-                response.sendRedirect(frontendUrl + "/payment-failed?code=enrollment_failed");
-            }
-        } else {
+        if (!"00".equals(responseCode)) {
             response.sendRedirect(frontendUrl + "/payment-failed?code=vnpay_failed");
+            return;
+        }
+
+        try {
+            BigDecimal totalAmount = new BigDecimal(vnpAmount).divide(new BigDecimal(100));
+            saveSuccessfulPayment(txnRef, courseId, courseTitle, studentEmail, teacherEmail, teacherId, totalAmount);
+            callEnrollmentService(courseId, courseTitle, studentEmail, teacherId);
+            response.sendRedirect(frontendUrl + "/payment-success?courseId=" + courseId);
+        } catch (Exception e) {
+            logger.error("!!! [VNPAY RETURN ERROR]", e);
+            response.sendRedirect(frontendUrl + "/payment-failed?code=vnpay_processing_failed");
         }
     }
 
-    // Hàm gọi Enrollment Service
+    @PostMapping("/test/success")
+    public ResponseEntity<RestResponse<Map<String, Object>>> simulateSuccessfulPayment(
+            @RequestParam("amount") BigDecimal amount,
+            @RequestParam("courseId") Long courseId,
+            @RequestParam("courseTitle") String courseTitle,
+            @RequestParam("email") String studentEmail,
+            @RequestParam("teacherEmail") String teacherEmail,
+            @RequestParam("teacherId") Long teacherId) {
+
+        if (!paymentTestModeEnabled) {
+            return ResponseEntity.status(403)
+                    .body(RestResponse.error("Che do test thanh toan dang tat", 403));
+        }
+
+        String transactionId = "TEST_" + System.currentTimeMillis();
+        saveSuccessfulPayment(transactionId, courseId, courseTitle, studentEmail, teacherEmail, teacherId, amount);
+        callEnrollmentService(courseId, courseTitle, studentEmail, teacherId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("transactionId", transactionId);
+        data.put("courseId", courseId);
+        data.put("amount", amount);
+
+        return ResponseEntity.ok(RestResponse.success(data, "Gia lap thanh toan thanh cong"));
+    }
+
+    private void saveSuccessfulPayment(String transactionId, Long courseId, String courseTitle, String studentEmail,
+                                       String teacherEmail, Long teacherId, BigDecimal totalAmount) {
+        BigDecimal adminShare = totalAmount.multiply(new BigDecimal("0.40"));
+        BigDecimal teacherShare = totalAmount.subtract(adminShare);
+
+        TransactionHistory history = new TransactionHistory();
+        history.setTransactionId(transactionId);
+        history.setCourseId(courseId);
+        history.setCourseTitle(courseTitle);
+        history.setStudentEmail(studentEmail);
+        history.setTeacherEmail(teacherEmail);
+        history.setTeacherId(teacherId);
+        history.setTotalAmount(totalAmount);
+        history.setAdminCommission(adminShare);
+        history.setTeacherReceived(teacherShare);
+        transactionRepository.save(history);
+
+        try {
+            logger.info(">>> [PAYMENT SUCCESS] Cong vi cho Teacher ID: {}, amount: {}", teacherId, teacherShare);
+            walletService.processRevenueShare(teacherId, totalAmount, courseTitle);
+        } catch (Exception e) {
+            logger.error("!!! [ERROR] Loi cong vi: ", e);
+        }
+    }
+
     private void callEnrollmentService(Long courseId, String courseTitle, String email, Long teacherId) {
         String enrollmentUrl = enrollmentServiceUrl + "/api/v1/enrollments/internal/enroll";
 
@@ -217,7 +247,6 @@ public class PaymentController {
         restTemplate.postForObject(enrollmentUrl, entity, String.class);
     }
 
-    // --- Các API thống kê ---
     @GetMapping("/history")
     public ResponseEntity<List<TransactionHistory>> getAllTransactions() {
         List<TransactionHistory> list = transactionRepository.findAll();
@@ -228,7 +257,7 @@ public class PaymentController {
     @GetMapping("/stats/monthly-revenue")
     public ResponseEntity<RestResponse<List<ChartDataDTO>>> getMonthlyRevenue() {
         List<ChartDataDTO> stats = transactionRepository.getMonthlyRevenue();
-        return ResponseEntity.ok(RestResponse.success(stats, "Lấy doanh thu tháng thành công"));
+        return ResponseEntity.ok(RestResponse.success(stats, "Lay doanh thu thang thanh cong"));
     }
 
     @GetMapping("/stats/dashboard")
@@ -249,6 +278,6 @@ public class PaymentController {
         data.put("recentTransactions", recentTransactions);
         data.put("totalRevenue", totalRevenue);
 
-        return ResponseEntity.ok(RestResponse.success(data, "Lấy Dashboard thành công"));
+        return ResponseEntity.ok(RestResponse.success(data, "Lay Dashboard thanh cong"));
     }
 }

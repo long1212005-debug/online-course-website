@@ -51,14 +51,20 @@ const AdminRevenue = () => {
   const fetchRevenueData = async () => {
     try {
       const res = await axiosClient.get("/payments/history");
-      const data = res.data;
+      const data = Array.isArray(res.data?.data)
+        ? res.data.data
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
 
       // Sắp xếp giao dịch theo ngày cũ nhất -> mới nhất để vẽ biểu đồ line
-      data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const sortedData = [...data].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      );
 
-      setTransactions(data.reverse()); // Đảo ngược lại để hiển thị table (Mới nhất lên đầu)
+      setTransactions([...sortedData].reverse()); // Đảo ngược lại để hiển thị table (Mới nhất lên đầu)
 
-      processChartData(data);
+      processChartData(sortedData);
     } catch (err) {
       console.error("Lỗi tải doanh thu:", err);
     } finally {
@@ -73,7 +79,7 @@ const AdminRevenue = () => {
     let totalTeacher = 0;
 
     transactions.forEach((t) => {
-      const amount = t.totalAmount || 0;
+      const amount = Number(t.totalAmount || 0);
 
       // 1. Tính tổng chia sẻ (40% Admin - 60% Giáo viên)
       totalAdmin += amount * 0.4;
