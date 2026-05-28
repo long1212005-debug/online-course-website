@@ -138,6 +138,7 @@ services:
       RABBIT_HOST: rabbitmq
       RABBIT_USERNAME: admin
       RABBIT_PASSWORD: admin
+      UPLOAD_DIR: /app/uploads
     depends_on:
       mysql:
         condition: service_healthy

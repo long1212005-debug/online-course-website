@@ -1,5 +1,6 @@
 package com.soa.course_service.service.impl;
 
+import com.soa.course_service.config.UploadStorage;
 import com.soa.course_service.entity.Banner;
 import com.soa.course_service.repository.BannerRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.UUID;
 public class BannerServiceImpl {
 
     private final BannerRepository bannerRepository;
-    private final String UPLOAD_DIR = "uploads/images/";
+    private final UploadStorage uploadStorage;
 
     public List<Banner> getAllBanners() {
         return bannerRepository.findAll();
@@ -39,7 +40,7 @@ public class BannerServiceImpl {
 
         if (image != null && !image.isEmpty()) {
             String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
-            Path path = Paths.get(UPLOAD_DIR + fileName);
+            Path path = uploadStorage.resolve("images").resolve(fileName);
             Files.createDirectories(path.getParent());
             Files.write(path, image.getBytes());
             banner.setImageUrl("/images/" + fileName);

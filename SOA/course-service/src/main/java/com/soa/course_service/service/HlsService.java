@@ -1,5 +1,6 @@
 package com.soa.course_service.service;
 
+import com.soa.course_service.config.UploadStorage;
 import com.soa.course_service.entity.Video;
 import com.soa.course_service.repository.VideoRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.nio.file.Paths;
 public class HlsService {
 
     private final VideoRepository videoRepository;
+    private final UploadStorage uploadStorage;
 
     @Async
     public void processVideoAsync(Long videoId, Path inputFilePath, String fileNameWithoutExt) {
@@ -39,8 +41,7 @@ public class HlsService {
             log.info(">>> Thời lượng video ID {}: {} giây", videoId, duration);
 
             // 🔥 BƯỚC 2: CẮT HLS (Giữ nguyên code cũ)
-            String outputDir = "uploads/hls";
-            Path outputFolderPath = Paths.get(outputDir, fileNameWithoutExt);
+            Path outputFolderPath = uploadStorage.resolve("hls").resolve(fileNameWithoutExt);
             if (!Files.exists(outputFolderPath)) {
                 Files.createDirectories(outputFolderPath);
             }

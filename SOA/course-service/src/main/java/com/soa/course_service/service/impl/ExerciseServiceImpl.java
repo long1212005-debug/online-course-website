@@ -1,5 +1,6 @@
 package com.soa.course_service.service.impl;
 
+import com.soa.course_service.config.UploadStorage;
 import com.soa.course_service.dto.*;
 import com.soa.course_service.entity.*;
 import com.soa.course_service.repository.*;
@@ -24,6 +25,7 @@ public class ExerciseServiceImpl implements ExerciseService {
 
     private final ExerciseRepository exerciseRepository;
     private final VideoRepository videoRepository;
+    private final UploadStorage uploadStorage;
     private final SubmissionRepository submissionRepository;
 
     // Map Entity -> DTO
@@ -49,7 +51,7 @@ public class ExerciseServiceImpl implements ExerciseService {
         String fileName = UUID.randomUUID() + "_" + StringUtils.cleanPath(file.getOriginalFilename());
 
         // 🔥 SỬA: Dùng đường dẫn tuyệt đối hoặc log ra để kiểm tra
-        Path path = Paths.get("uploads/exercises");
+        Path path = uploadStorage.resolve("exercises");
 
         if (!Files.exists(path)) {
             try {

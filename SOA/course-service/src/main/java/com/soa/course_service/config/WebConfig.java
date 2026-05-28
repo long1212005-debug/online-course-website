@@ -7,13 +7,19 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+        private final UploadStorage uploadStorage;
+
+        public WebConfig(UploadStorage uploadStorage) {
+                this.uploadStorage = uploadStorage;
+        }
+
         @Override
         public void addResourceHandlers(ResourceHandlerRegistry registry) {
 
                 // 📌 Lấy đường dẫn gốc project course-service
-                String projectRoot = System.getProperty("user.dir");
+                String projectRoot = uploadStorage.root().toString();
 
-                String uploadPath = "file:" + projectRoot + "/uploads/";
+                String uploadPath = "file:" + projectRoot.replace("\\", "/") + "/";
 
                 System.out.println(">>> UPLOAD PATH = " + uploadPath);
 

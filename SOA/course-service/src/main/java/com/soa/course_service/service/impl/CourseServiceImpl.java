@@ -1,5 +1,6 @@
 package com.soa.course_service.service.impl;
 
+import com.soa.course_service.config.UploadStorage;
 import com.soa.course_service.dto.*;
 import com.soa.course_service.entity.*;
 import com.soa.course_service.repository.CourseRepository;
@@ -28,6 +29,7 @@ public class CourseServiceImpl implements CourseService {
     private final CourseRepository courseRepository;
     private final VideoRepository videoRepository;
     private final UserLessonProgressRepository progressRepository;
+    private final UploadStorage uploadStorage;
 
     private String formatDuration(Integer seconds) {
         if (seconds == null || seconds == 0)
@@ -65,7 +67,7 @@ public class CourseServiceImpl implements CourseService {
         if (file == null || file.isEmpty())
             return null;
         String fileName = UUID.randomUUID() + "_" + StringUtils.cleanPath(file.getOriginalFilename());
-        Path uploadPath = Paths.get("uploads/images");
+        Path uploadPath = uploadStorage.resolve("images");
         if (!Files.exists(uploadPath))
             Files.createDirectories(uploadPath);
         try (InputStream inputStream = file.getInputStream()) {

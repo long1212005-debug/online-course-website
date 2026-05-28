@@ -1,5 +1,6 @@
 package com.soa.course_service.service.impl;
 
+import com.soa.course_service.config.UploadStorage;
 import com.soa.course_service.dto.VideoResponseDTO;
 import com.soa.course_service.entity.Course;
 import com.soa.course_service.entity.Section;
@@ -30,6 +31,7 @@ public class VideoServiceImpl implements VideoService {
     private final VideoRepository videoRepository;
     private final CourseRepository courseRepository;
     private final HlsService hlsService;
+    private final UploadStorage uploadStorage;
 
     // SỬA: Đổi tham số duration từ Long thành Integer để khớp với Controller và
     // Entity
@@ -188,7 +190,7 @@ public class VideoServiceImpl implements VideoService {
 
     private Path saveTempFile(MultipartFile file) throws IOException {
         String uniqueFileName = UUID.randomUUID().toString();
-        Path tempDir = Paths.get("uploads/temp");
+        Path tempDir = uploadStorage.resolve("temp");
         if (!Files.exists(tempDir))
             Files.createDirectories(tempDir);
         Path tempFilePath = tempDir.resolve(uniqueFileName + ".mp4");
