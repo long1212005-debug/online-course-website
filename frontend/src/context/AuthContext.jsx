@@ -1,17 +1,42 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-// 1. Tạo Context và EXPORT NAMED (để sửa lỗi import { AuthContext })
+/**
+ * ============================================================================
+ * AUTHENTICATION CONTEXT & PROVIDER
+ * ============================================================================
+ * Quản lý trạng thái xác thực toàn cục (Global Authentication State):
+ * - Lưu trữ thông tin người dùng đang đăng nhập (user profile, roles, email).
+ * - Đồng bộ hóa token và thông tin phiên làm việc với localStorage.
+ * - Cung cấp các hành vi đăng nhập (login) và đăng xuất (logout) cho toàn ứng dụng.
+ * ============================================================================
+ */
+
+// 1. Khởi tạo React Context lưu trữ trạng thái đăng nhập
 export const AuthContext = createContext(null);
 
-// 2. Tạo Provider
+/**
+ * Provider bọc ngoài các component cần truy cập trạng thái người dùng
+ * 
+ * @param {object} props
+ * @param {React.ReactNode} props.children
+ */
 export const AuthProvider = ({ children }) => {
-  // Khởi tạo state user từ localStorage
+  // Khởi tạo state user ban đầu từ localStorage để giữ phiên đăng nhập khi F5 reload trang
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("user");
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = localStorage.getItem("user");
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      console.error("Không thể đọc thông tin người dùng từ localStorage:", e);
+      return null;
+    }
   });
 
-  // Hàm login
+  /**
+   * Lưu thông tin đăng nhập thành công vào state và localStorage
+   * 
+   * @param {object} userData Dữ liệu trả về từ backend API đăng nhập (chứa token, email, roles...)
+   */
   const login = (userData) => {
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
@@ -20,7 +45,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Hàm logout
+  /**
+   * Đăng xuất người dùng: Xóa sạch dữ liệu phiên khỏi state và localStorage
+   */
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
@@ -34,10 +61,15 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// 3. Export hook useAuth (Cách dùng hiện đại)
+/**
+ * Custom Hook tiện lợi giúp các Component con dễ dàng tiêu thụ AuthContext
+ * Thay vì phải import cả useContext và AuthContext ở mỗi file
+ * 
+ * @returns {{ user: object|null, login: Function, logout: Function }}
+ */
 export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-// 4. Default export (Để hỗ trợ import AuthContext from ...)
 export default AuthContext;
+
